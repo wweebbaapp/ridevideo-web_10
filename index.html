@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a1a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect width='192' height='192' rx='32' fill='%230a0a1a'/%3E%3Ccircle cx='60' cy='130' r='30' fill='none' stroke='%234fc3f7' stroke-width='8'/%3E%3Ccircle cx='132' cy='130' r='30' fill='none' stroke='%234fc3f7' stroke-width='8'/%3E%3Cpath d='M60 130 L90 80 L132 130 M90 80 L110 80' fill='none' stroke='%23ffc832' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="vendor/maplibre/maplibre-gl.css" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>RideVideo</title>
+</head>
+<body>
+  <div id="app">
+    <!-- Top bar -->
+    <header id="topbar">
+      <div class="brand">RideVideo</div>
+      <div class="file-btns">
+        <label class="btn gray">
+          🗺 Carica GPX
+          <input type="file" id="gpxInput" accept=".gpx,.tcx,application/gpx+xml" hidden />
+        </label>
+        <label class="btn gray">
+          🎬 Carica Video
+          <input type="file" id="videoInput" hidden />
+        </label>
+        <button id="btnIntervals" class="btn blue" title="Allenamento a intervalli">⏱ Intervalli</button>
+      </div>
+      <div id="placeBadge" class="place-badge" title="Località attuale">
+        <span id="placeText">—</span>
+      </div>
+      <div id="routeInfo" class="route-info">Nessun percorso</div>
+      <div class="font-ctl" role="group" aria-label="Dimensione del testo dell'interfaccia">
+        <button id="btnFontSmaller" class="icon-btn" title="Testo più piccolo" aria-label="Testo più piccolo">A−</button>
+        <button id="btnFontBigger" class="icon-btn" title="Testo più grande" aria-label="Testo più grande">A+</button>
+      </div>
+    </header>
+
+    <div id="resumeBar" class="resume-bar" hidden>
+      <span id="resumeText" class="resume-text"></span>
+      <button id="resumeBtn" class="btn green">Riprendi</button>
+      <button id="resumeDismiss" class="btn gray">Ignora</button>
+    </div>
+
+    <!-- Main stage -->
+    <main id="stage">
+      <div id="videoCol">
+        <div id="videoWrap">
+          <div id="map" hidden></div>
+          <div id="videoBox">
+            <video id="video" playsinline muted preload="metadata"></video>
+          </div>
+          <div id="placeholder" class="placeholder">Carica un GPX e un video</div>
+          <div id="mapAttribution" hidden>
+            Mappa © OpenStreetMap contributors · Rilievo AWS Open Data
+          </div>
+          <canvas id="hudCanvas" class="hud"></canvas>
+
+          <div id="intervalView" class="interval-view" hidden>
+            <div class="iv-top">
+              <div class="iv-phase-box">
+                <div id="ivPhase" class="iv-phase">INTERVALLI</div>
+                <div id="ivSub" class="iv-sub">Configura o avvia l'allenamento</div>
+                <div class="iv-progress"><span id="ivPhaseFill"></span></div>
+              </div>
+              <div class="iv-timer-box">
+                <div id="ivTimer" class="iv-timer">00:00</div>
+                <div id="ivTimerLabel" class="iv-timer-label">rimanenti nella fase</div>
+              </div>
+              <div class="iv-total-box">
+                <div id="ivTotal" class="iv-total">0:00:00</div>
+                <div class="iv-total-label">totale rimanente</div>
+              </div>
+              <button id="btnFtpTest" class="btn gray iv-ftp" title="Avvia il test FTP di 20 minuti">🔥 Test FTP</button>
+              <button id="btnIntervalConfig" class="btn gray iv-config" title="Configura allenamento">⚙ Configura</button>
+            </div>
+            <div class="iv-graph-wrap">
+              <canvas id="intervalCanvas"></canvas>
+              <div id="ivAlert" class="iv-alert" hidden></div>
+            </div>
+            <div class="iv-bottom">
+              <div class="iv-headline">
+                <div id="ivNext" class="iv-next">Poi: —</div>
+                <div id="ivTargets" class="iv-targets">Target: —</div>
+                <div id="ivLive" class="iv-live">Attuale: —</div>
+              </div>
+              <div class="iv-big-stats">
+                <div class="iv-big-stat iv-big-power">
+                  <span class="iv-big-k">WATT REALT</span>
+                  <strong id="ivBigPower">—</strong>
+                  <small id="ivPowerDelta">in attesa del trainer</small>
+                </div>
+                <div class="iv-big-stat iv-big-target">
+                  <span class="iv-big-k">WATT RICHIESTI</span>
+                  <strong id="ivBigTarget">—</strong>
+                  <small id="ivPowerTargetPct">—</small>
+                </div>
+                <div class="iv-big-stat iv-big-rpm">
+                  <span class="iv-big-k">RPM REALT</span>
+                  <strong id="ivBigRpm">—</strong>
+                  <small id="ivRpmTarget">—</small>
+                </div>
+                <div class="iv-big-stat iv-big-slope">
+                  <span class="iv-big-k">PENDENZA</span>
+                  <strong id="ivBigSlope">—</strong>
+                  <small id="ivSlopeTarget">—</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Elevation profile: whole route, live position marker -->
+        <div id="elevBar">
+          <canvas id="elevCanvas"></canvas>
+        </div>
+      </div>
+
+      <!-- Charts column -->
+      <aside id="charts">
+        <canvas id="chartPower" class="chart chart-power"></canvas>
+        <canvas id="chartSlope" class="chart chart-slope"></canvas>
+        <canvas id="ivZoomCanvas" class="chart chart-slope iv-zoom" hidden></canvas>
+      </aside>
+    </main>
+
+    <!-- Controls -->
+    <footer id="controls">
+      <div class="row">
+        <button id="btnPlay" class="btn green" disabled>▶  Play</button>
+        <button id="btnReset" class="btn gray" disabled>⟲  Reset</button>
+        <button id="btnSave" class="btn blue" disabled>💾  Salva</button>
+        <button id="btnMapMode" class="btn blue" disabled>🗺 Mappa 3D</button>
+        <div id="mapControls" class="map-controls" hidden>
+          <button id="btnMapZoomOut" class="icon-btn" title="Riduci zoom mappa" aria-label="Riduci zoom mappa">−</button>
+          <button id="btnMapZoomIn" class="icon-btn" title="Aumenta zoom mappa" aria-label="Aumenta zoom mappa">+</button>
+          <button id="btnMapFollow" class="btn gray map-follow" title="Segui il ciclista">🎯 Segui</button>
+        </div>
+        <label class="ctl">Vai a <input type="number" id="seekKm" min="0" step="0.01" inputmode="decimal" enterkeyhint="go" placeholder="km" disabled /> km</label>
+        <label class="ctl"><span id="zoomLabelText">Altimetria ±</span> <input type="number" id="zoomM" min="5" max="50000" step="5" inputmode="numeric" value="50" /> <span id="zoomUnit">m</span></label>
+        <span class="spacer"></span>
+        <label class="ctl">Potenza <input type="range" id="powerSlider" min="0" max="500" value="180" /> <b id="powerVal">180 W</b></label>
+        <label class="ctl">Massa <input type="range" id="massSlider" min="50" max="130" value="75" /> <b id="massVal">75 kg</b></label>
+      </div>
+      <div class="row">
+        <button id="btnSlopeMode" class="btn gray">Pendenza: Auto da GPX</button>
+        <input type="range" id="slopeSlider" min="-150" max="200" value="0" disabled />
+        <b id="slopeVal">0.0%</b>
+        <span class="spacer"></span>
+        <button id="btnTrainer" class="btn blue">Connetti trainer</button>
+        <span id="trainerStatus" class="trainer-status">disconnesso</span>
+        <button id="btnHistory" class="btn gray">📊 Storico</button>
+      </div>
+    </footer>
+
+    <div id="status">Pronto</div>
+
+    <div id="modalBackdrop" class="modal-backdrop" hidden>
+      <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <header class="modal-head">
+          <h2 id="modalTitle">Storico</h2>
+          <button id="modalClose" class="icon-btn" aria-label="Chiudi">✕</button>
+        </header>
+        <div id="modalBody" class="modal-body"></div>
+        <footer id="modalFoot" class="modal-foot"></footer>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
